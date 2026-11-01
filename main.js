@@ -1,3 +1,5 @@
+import { buildContourPaths, buildFlowTexture } from './contour-flow.mjs';
+
 /* ASRO Homepage Concept — shader-powered particle logo, no runtime dependencies.
    The mask is generated from assets/asro-logo.svg (vectorized from ASRO's supplied logo).
    Scroll is reversible; effects are optional for reduced-motion and non-WebGL devices. */
@@ -74,12 +76,12 @@ let animationStart = performance.now();
 const vertexSource = `#version 300 es
 precision highp float;
 in vec2 aTarget;
-in vec2 aFlowTarget;
 in vec2 aOrigin;
 in vec2 aSide;
 in float aSeed;
 in float aSize;
-in float aMotion;
+in vec4 aFlow; // row, start index, path length, intensity
+uniform sampler2D uPathTexture;
 uniform float uTime;
 uniform float uGather;
 uniform float uDrift;
@@ -93,56 +95,41 @@ out float vSpread;
 out float vSpark;
 out float vMoving;
 void main() {
-  float gather = smoothstep(0.0, 1.0, uGather);
-  // Stagger each particle just enough to make the breakup and reassembly organic.
-  float drift = smoothstep(0.0, 1.0, uDrift + (aSeed - 0.5) * 0.18);
-  float spread = smoothstep(0.0, 1.0, uSpread + (aSeed - 0.5) * 0.22);
-  vec2 logoPosition = aTarget * uScale;
-  // Each flow target is ALSO a real point inside the supplied logo.
-  // About 56% of particles travel clearly between two points; the rest
-  // hold the edges, keeping the symbol and wordmark recognizable.
-  float loop = .5 + .5 * sin(uTime * (1.9 + aSeed * .85) + aSeed * 6.283185);
-  loop = smoothstep(0.0, 1.0, loop);
-  vec2 flowing = mix(logoPosition, aFlowTarget * uScale, loop * aMotion);
-
-  // Gentle coordinated waves bring every particle to life. The moving
-  // flow layer is much more noticeable than the earlier tiny shimmer.
-  float wave = logoPosition.y * 15.0 + logoPosition.x * 6.0 - uTime * 1.65;
-  vec2 current = vec2(
-    sin(logoPosition.y * 13.0 - uTime * 1.55 + sin(wave) * .38),
-    cos(logoPosition.x * 12.0 + uTime * 1.25 + cos(wave) * .30)
-  ) * (uScale * .014);
-  float orbitPhase = uTime * (1.25 + aSeed * .5) + aSeed * 31.416;
-  vec2 orbit = vec2(cos(orbitPhase), sin(orbitPhase)) *
-               (uScale * (.004 + aSeed * .008));
-  vec2 aliveLogo = flowing + current + orbit;
-  vec2 roaming = aOrigin + vec2(sin(uTime * .25 + aSeed * 31.0),
-                                cos(uTime * .3 + aSeed * 17.0)) * .052;
-  vec2 assembled = mix(roaming, aliveLogo, gather);
-  vec2 peeling = mix(assembled, aliveLogo * vec2(.65, .94), drift);
-  vec2 edges = vec2(aSide.x + sin(uTime * .26 + aSeed * 11.0) * .017,
-                    aSide.y + sin(uTime * .42 + aSeed * 22.0) * .064);
-  vec2 position = mix(peeling, edges, drift * spread);
-  position += uMouse * .014 * (1.0 - spread);
-  gl_Position = vec4(position, 0.0, 1.0);
-  // A traveling highlight and individual twinkles give the logo an
-  // unmistakably living texture without changing its overall silhouette.
-  float lightBand = pow(
-    max(0.0, sin(logoPosition.x * 13.0 + logoPosition.y * 6.0 - uTime * 1.6)),
-    12.0
-  );
-  float twinkle = pow(max(0.0, sin(uTime * (1.4 + aSeed) + aSeed * 127.0)), 18.0);
-  float activeGlow = (lightBand * .75 + twinkle * .64) * gather;
-  // Moving dots are visibly more luminous than the anchored silhouette.
-  float movingGlow = aMotion * (.22 + .55 *
-      pow(max(0.0, sin(uTime * 2.8 + aSeed * 43.0)), 9.0));
-  vSpark = activeGlow + movingGlow * gather;
-  vMoving = aMotion * gather;
-  gl_PointSize = aSize * uDpr * mix(1.08, 1.25, spread) *
-                 (1.0 + activeGlow * .32 + aMotion * .18);
-  vAlpha = mix(.88, .94, spread) * (.76 + .24 * sin(aSeed * 99.0 + uTime * .8));
-  vTone = aSeed;
-  vSpread = spread;
+  float gather = smoothstep(0.0,1.0,uGather);
+  float drift = smoothstep(0.0,1.0,uDrift + (aSeed-.5)*.18);
+  float spread = smoothstep(0.0,1.0,uSpread + (aSeed-.5)*.22);
+  vec2 logo = aTarget*uScale;
+  float wave = logo.x*11.0 + logo.y*8.0-uTime*1.15;
+  vec2 tinyFlow = vec2(cos(wave),sin(wave))*uScale*.0034;
+  vec2 alive = logo+tinyFlow;
+  if (aFlow.z>=2.0) {
+    // Looping paths follow the original logo and its inward contours,
+    // with no teleporting between strokes.
+    float pace=5.7+aFlow.w*3.0+aSeed*1.0;
+    float phase=mod(aFlow.y+uTime*pace,aFlow.z);
+    int first=int(floor(phase));
+    int second=(first+1)%int(aFlow.z);
+    int row=int(aFlow.x);
+    vec2 p0=texelFetch(uPathTexture,ivec2(first,row),0).xy;
+    vec2 p1=texelFetch(uPathTexture,ivec2(second,row),0).xy;
+    alive=mix(p0,p1,fract(phase))*uScale+tinyFlow*.10;
+  }
+  vec2 roaming=aOrigin+vec2(sin(uTime*.25+aSeed*31.0),
+                            cos(uTime*.30+aSeed*17.0))*.052;
+  vec2 assembled=mix(roaming,alive,gather);
+  vec2 peeling=mix(assembled,alive*vec2(.65,.94),drift);
+  vec2 edges=vec2(aSide.x+sin(uTime*.26+aSeed*11.0)*.017,
+                  aSide.y+sin(uTime*.42+aSeed*22.0)*.064);
+  vec2 pos=mix(peeling,edges,drift*spread);
+  pos+=uMouse*.014*(1.0-spread);
+  gl_Position=vec4(pos,0.0,1.0);
+  vMoving=step(2.0,aFlow.z)*aFlow.w*gather;
+  float shimmer=pow(max(0.0,sin(logo.x*8.0+logo.y*4.0-uTime*.8)),13.0);
+  vSpark=shimmer*.29*gather;
+  gl_PointSize=aSize*uDpr*mix(1.07,1.24,spread)*(1.0+vMoving*.20+vSpark*.24);
+  vAlpha=mix(.86,.93,spread)*(.83+.17*sin(aSeed*99.0+uTime*.7));
+  vTone=aSeed;
+  vSpread=spread;
 }`;
 const fragmentSource = `#version 300 es
 precision highp float;
@@ -153,15 +140,15 @@ in float vSpark;
 in float vMoving;
 out vec4 outColor;
 void main() {
-  float d = length(gl_PointCoord - vec2(.5));
-  float halo = 1.0 - smoothstep(.10, .5, d);
-  float core = 1.0 - smoothstep(.04, .19, d);
-  if (halo < .015) discard;
-  vec3 color = mix(vec3(.18,.52,1.0),vec3(.81,.95,1.0),vTone);
-  color = mix(color, vec3(.42,.72,1.0),vSpread * .12);
-  color = mix(color, vec3(.94,.98,1.0), min(1.0, vSpark * .72 + vMoving * .17));
-  float opacity = min(1.0, halo * .68 + core * .62 + vSpark * .27 + vMoving * .08) * vAlpha;
-  outColor = vec4(color, opacity);
+  float d=length(gl_PointCoord-vec2(.5));
+  float halo=1.0-smoothstep(.08,.5,d);
+  float core=1.0-smoothstep(.02,.17,d);
+  if(halo<.015)discard;
+  vec3 color=mix(vec3(.18,.52,1.0),vec3(.81,.95,1.0),vTone);
+  color=mix(color,vec3(.47,.76,1.0),vSpread*.11);
+  color=mix(color,vec3(.94,.985,1.0),min(1.0,vMoving*.28+vSpark*.42));
+  float opacity=min(1.0,halo*.68+core*.62+vMoving*.07+vSpark*.14)*vAlpha;
+  outColor=vec4(color,opacity);
 }`;
 
 function shader(gl, type, source) {
@@ -202,7 +189,7 @@ async function loadLogoMask() {
     }
   }
   if (list.length < 300) throw new Error('Logo mask was empty.');
-  return list;
+  return {list,pixels};
 }
 
 async function startParticles() {
@@ -214,61 +201,57 @@ async function startParticles() {
   try {
     const mask = await loadLogoMask();
     const program = createProgram(gl);
+    const paths = buildContourPaths(mask.pixels,600,600,3);
+    const pathMap = buildFlowTexture(paths,Math.min(4096,gl.getParameter(gl.MAX_TEXTURE_SIZE)));
+    const pathTexture = gl.createTexture();
+    gl.activeTexture(gl.TEXTURE0);
+    gl.bindTexture(gl.TEXTURE_2D,pathTexture);
+    gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MIN_FILTER,gl.NEAREST);
+    gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MAG_FILTER,gl.NEAREST);
+    gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_S,gl.CLAMP_TO_EDGE);
+    gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_T,gl.CLAMP_TO_EDGE);
+    gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA32F,pathMap.textureWidth,pathMap.textureHeight,0,gl.RGBA,gl.FLOAT,pathMap.pixels);
+    if(gl.getError()!==gl.NO_ERROR)throw Error('Unable to upload circulation paths');
+    gl.useProgram(program);
+    gl.uniform1i(gl.getUniformLocation(program,'uPathTexture'),0);
     const count = window.innerWidth < 650 ? 16000 : 30000;
     const data = {
-      aTarget: new Float32Array(count*2),
-      aFlowTarget: new Float32Array(count*2),
-      aOrigin: new Float32Array(count*2),
-      aSide: new Float32Array(count*2),
-      aSeed: new Float32Array(count),
-      aSize: new Float32Array(count),
-      aMotion: new Float32Array(count)
+      aTarget:new Float32Array(count*2),
+      aOrigin:new Float32Array(count*2),
+      aSide:new Float32Array(count*2),
+      aSeed:new Float32Array(count),
+      aSize:new Float32Array(count),
+      aFlow:new Float32Array(count*4)
     };
-    const rand = Math.random;
-    // Validate intermediate positions so a moving particle never cuts
-    // across the background between separate logo strokes or letters.
-    const maskCanvas = document.createElement('canvas');
-    maskCanvas.width = maskCanvas.height = 600;
-    const maskCtx = maskCanvas.getContext('2d', { willReadFrequently:true });
-    const logoImage = new Image();
-    logoImage.src = './assets/asro-logo.svg';
-    await logoImage.decode();
-    maskCtx.drawImage(logoImage, 0, 0, 600, 600);
-    const alpha = maskCtx.getImageData(0, 0, 600, 600).data;
-    const inside = (x,y) => {
-      x=Math.round(x);y=Math.round(y);
-      return x>=0 && x<600 && y>=0 && y<600 && alpha[(y*600+x)*4+3]>170;
+    const rand=Math.random;
+    const selectTrack=()=>{
+      const n=rand()*pathMap.totalWeight;
+      return pathMap.tracks.find(t=>n<t.cumulative)||pathMap.tracks[pathMap.tracks.length-1];
     };
-    const chooseFlow = (x,y) => {
-      for(let attempt=0;attempt<25;attempt++) {
-        const angle=rand()*Math.PI*2, dist=19+rand()*65;
-        const tx=x+Math.cos(angle)*dist, ty=y+Math.sin(angle)*dist;
-        if(inside(tx,ty) &&
-           inside(x+(tx-x)*.2,y+(ty-y)*.2) &&
-           inside(x+(tx-x)*.4,y+(ty-y)*.4) &&
-           inside(x+(tx-x)*.6,y+(ty-y)*.6) &&
-           inside(x+(tx-x)*.8,y+(ty-y)*.8)) return [tx,ty];
+    for(let i=0;i<count;i++){
+      const seed=rand(),angle=rand()*Math.PI*2;
+      const radius=.32+Math.sqrt(rand())*1.2;
+      if(rand()<.48){
+        const track=selectTrack(), sample=Math.floor(rand()*track.length);
+        const off=(track.row*pathMap.textureWidth+sample)*4;
+        data.aTarget[i*2]=pathMap.pixels[off];
+        data.aTarget[i*2+1]=pathMap.pixels[off+1];
+        data.aFlow[i*4]=track.row;
+        data.aFlow[i*4+1]=sample;
+        data.aFlow[i*4+2]=track.length;
+        data.aFlow[i*4+3]=track.strength;
+      } else {
+        const [x,y]=mask.list[Math.floor(rand()*mask.list.length)];
+        data.aTarget[i*2]=(x-293)/196+(rand()-.5)*.008;
+        data.aTarget[i*2+1]=(300-y)/196+(rand()-.5)*.008;
       }
-      return null;
-    };
-    for (let i=0;i<count;i++) {
-      const [x,y] = mask[Math.floor(rand()*mask.length)];
-      const seed = rand(), angle = rand()*Math.PI*2;
-      const radius = .32 + Math.sqrt(rand())*1.2;
-      data.aTarget[2*i] = (x-293)/196 + (rand()-.5)*.008;
-      data.aTarget[2*i+1] = (300-y)/196 + (rand()-.5)*.008;
-      // 56% are traveling particles; the remainder preserve the edges.
-      const other = rand()<.56 ? chooseFlow(x,y) : null;
-      data.aFlowTarget[2*i] = other ? (other[0]-293)/196 : data.aTarget[2*i];
-      data.aFlowTarget[2*i+1] = other ? (300-other[1])/196 : data.aTarget[2*i+1];
-      data.aMotion[i] = other ? .82+rand()*.18 : 0;
-      data.aOrigin[2*i] = Math.cos(angle)*radius*1.25;
-      data.aOrigin[2*i+1] = Math.sin(angle)*radius;
-      const side = (rand()<.5 ? -1 : 1);
-      data.aSide[2*i] = side * (.72 + rand()*.28);
-      data.aSide[2*i+1] = (rand()*2-1)*.92;
-      data.aSeed[i] = seed;
-      data.aSize[i] = 1.35 + rand()*2.0 + (rand()>.965?1.5:0);
+      data.aOrigin[i*2]=Math.cos(angle)*radius*1.25;
+      data.aOrigin[i*2+1]=Math.sin(angle)*radius;
+      const side=rand()<.5?-1:1;
+      data.aSide[i*2]=side*(.72+rand()*.28);
+      data.aSide[i*2+1]=(rand()*2-1)*.92;
+      data.aSeed[i]=seed;
+      data.aSize[i]=1.35+rand()*2.0+(rand()>.965?1.5:0);
     }
     gl.useProgram(program);
     const vao = gl.createVertexArray(); gl.bindVertexArray(vao);
@@ -277,7 +260,7 @@ async function startParticles() {
       gl.bindBuffer(gl.ARRAY_BUFFER,buffer);
       gl.bufferData(gl.ARRAY_BUFFER,values,gl.STATIC_DRAW);
       gl.enableVertexAttribArray(location);
-      gl.vertexAttribPointer(location, ['aSeed','aSize','aMotion'].includes(name)?1:2,gl.FLOAT,false,0,0);
+      gl.vertexAttribPointer(location,name==='aFlow'?4:((name==='aSeed'||name==='aSize')?1:2),gl.FLOAT,false,0,0);
     }
     gl.bindVertexArray(null);
     gl.enable(gl.BLEND); gl.blendFunc(gl.SRC_ALPHA,gl.ONE);
@@ -316,6 +299,8 @@ async function startParticles() {
       const sizePx=Math.min(width*.8,height*.74,690);
       mouse.x+=(pointer.x-mouse.x)*.04;mouse.y+=(pointer.y-mouse.y)*.04;
       gl.clear(gl.COLOR_BUFFER_BIT);
+      gl.activeTexture(gl.TEXTURE0);
+      gl.bindTexture(gl.TEXTURE_2D,pathTexture);
       gl.useProgram(program);gl.bindVertexArray(vao);
       gl.uniform1f(uniform.uTime,(now-start)/1000);
       gl.uniform1f(uniform.uGather,gather);
