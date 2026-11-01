@@ -88,25 +88,46 @@ uniform float uDpr;
 out float vAlpha;
 out float vTone;
 out float vSpread;
+out float vSpark;
 void main() {
   float gather = smoothstep(0.0, 1.0, uGather);
   // Stagger each particle just enough to make the breakup and reassembly organic.
   float drift = smoothstep(0.0, 1.0, uDrift + (aSeed - 0.5) * 0.18);
   float spread = smoothstep(0.0, 1.0, uSpread + (aSeed - 0.5) * 0.22);
   vec2 logoPosition = aTarget * uScale;
-  vec2 shimmer = vec2(sin(uTime * 0.74 + aSeed * 43.0),
-                      cos(uTime * 0.62 + aSeed * 38.0)) * .003;
+  // Two coherent currents pass through the completed mark rather than
+  // freezing every particle at its target. Scale by logo size so mobile
+  // and desktop have similar apparent movement in pixels.
+  float wave = logoPosition.y * 16.0 + logoPosition.x * 7.0 - uTime * 1.25;
+  vec2 current = vec2(
+    sin(logoPosition.y * 15.0 - uTime * 1.1 + sin(wave) * .35),
+    cos(logoPosition.x * 14.0 + uTime * .96 + cos(wave) * .30)
+  ) * (uScale * .026);
+  // Each particle also has a small personal orbit; the logo stays legible.
+  float orbitPhase = uTime * (1.0 + aSeed * .42) + aSeed * 31.416;
+  vec2 orbit = vec2(cos(orbitPhase), sin(orbitPhase)) *
+               (uScale * (.008 + aSeed * .009));
+  vec2 aliveLogo = logoPosition + current + orbit;
   vec2 roaming = aOrigin + vec2(sin(uTime * .25 + aSeed * 31.0),
                                 cos(uTime * .3 + aSeed * 17.0)) * .052;
-  vec2 assembled = mix(roaming, logoPosition + shimmer, gather);
-  vec2 peeling = mix(assembled, logoPosition * vec2(.65, .94) + shimmer, drift);
+  vec2 assembled = mix(roaming, aliveLogo, gather);
+  vec2 peeling = mix(assembled, aliveLogo * vec2(.65, .94), drift);
   vec2 edges = vec2(aSide.x + sin(uTime * .26 + aSeed * 11.0) * .017,
                     aSide.y + sin(uTime * .42 + aSeed * 22.0) * .064);
   vec2 position = mix(peeling, edges, drift * spread);
   position += uMouse * .014 * (1.0 - spread);
   gl_Position = vec4(position, 0.0, 1.0);
-  gl_PointSize = aSize * uDpr * mix(1.06, 1.25, spread);
-  vAlpha = mix(.88, .94, spread) * (.8 + .2 * sin(aSeed * 99.0 + uTime * .8));
+  // A traveling highlight and individual twinkles give the logo an
+  // unmistakably living texture without changing its overall silhouette.
+  float lightBand = pow(
+    max(0.0, sin(logoPosition.x * 13.0 + logoPosition.y * 6.0 - uTime * 1.6)),
+    12.0
+  );
+  float twinkle = pow(max(0.0, sin(uTime * (1.4 + aSeed) + aSeed * 127.0)), 18.0);
+  float activeGlow = (lightBand * .66 + twinkle * .55) * gather;
+  vSpark = activeGlow;
+  gl_PointSize = aSize * uDpr * mix(1.08, 1.25, spread) * (1.0 + activeGlow * .32);
+  vAlpha = mix(.88, .94, spread) * (.76 + .24 * sin(aSeed * 99.0 + uTime * .8));
   vTone = aSeed;
   vSpread = spread;
 }`;
@@ -115,6 +136,7 @@ precision highp float;
 in float vAlpha;
 in float vTone;
 in float vSpread;
+in float vSpark;
 out vec4 outColor;
 void main() {
   float d = length(gl_PointCoord - vec2(.5));
@@ -123,7 +145,8 @@ void main() {
   if (halo < .015) discard;
   vec3 color = mix(vec3(.18,.52,1.0),vec3(.81,.95,1.0),vTone);
   color = mix(color, vec3(.42,.72,1.0),vSpread * .12);
-  float opacity = min(1.0, halo * .68 + core * .62) * vAlpha;
+  color = mix(color, vec3(.94,.98,1.0), min(1.0, vSpark * .72));
+  float opacity = min(1.0, halo * .68 + core * .62 + vSpark * .24) * vAlpha;
   outColor = vec4(color, opacity);
 }`;
 
@@ -234,9 +257,10 @@ async function startParticles() {
     let frameRequested=false;
     function render(now) {
       frameRequested=false;
-      if (document.hidden || reducedMotion.matches) return;
+      if (reducedMotion.matches) return;
       frameRequested=true;
       requestAnimationFrame(render);
+      if (document.hidden) return;
       if (now-last < (width<650 ? 20 : 14)) return;
       last=now;
       const rect=story.getBoundingClientRect();
