@@ -28,3 +28,142 @@
 @media(max-width:780px){.site-header{height:68px;padding:0 22px}.desktop-nav,.nav-contact{display:none}.menu-toggle{display:block}.mobile-nav{top:68px}.hero-words{bottom:16%;padding:0 20px}.eyebrow{font-size:9px;letter-spacing:.13em}.hero-subtitle{font-size:12px}.scroll-hint{display:none}.replay{bottom:25px;right:20px}.stat-grid{gap:12px;margin-top:45px}.stat-card{padding-right:0}.product-grid{grid-template-columns:1fr}.product-card{min-height:370px}.introduction p br{display:none}.introduction p{max-width:315px}.section{padding:100px 24px}.footer{flex-wrap:wrap;gap:18px}.footer span:last-child{width:100%}}
 @media(max-width:420px){.stat-card strong{font-size:23px}.stat-card>span:last-child{font-size:10px}.product-card{padding:27px}.section-heading h2{font-size:36px}.hero-subtitle{letter-spacing:0}.introduction h1{font-size:56px}.introduction p{line-height:1.9}.scroll-story{height:250vh}}
 @media(prefers-reduced-motion:reduce){html{scroll-behavior:auto}*,*::before,*::after{animation-duration:.001ms!important;transition-duration:.001ms!important}.scroll-story{height:100svh}.stage{position:relative}.hero-words{opacity:1!important}.scroll-invite,.stage-progress,.scroll-hint{display:none}.introduction{display:none}.static-logo{opacity:1!important}.product-card:hover{transform:none}}
+
+
+/* ===== ASRO HOMEPAGE DARK V2 =====
+   Consistent dark surfaces; deeper scrolling; brighter particle-stage contrast.
+   These overrides deliberately leave the existing responsive layout intact. */
+:root {
+  color-scheme: dark;
+  --ink: #edf5ff;
+  --sub: #aabed9;
+  --paper: #07111f;
+  --navy: #040914;
+}
+body {
+  color: #edf5ff;
+  background: #040914;
+}
+::selection { background: #3b79cd; color: #fff; }
+.skip-link { color: #edf5ff; background: #102541; }
+.site-header,
+.site-header.is-light {
+  color: #f4f9ff;
+  background: rgba(5, 12, 25, .7);
+  border-color: rgba(175, 213, 255, .11);
+}
+.brand img, .site-header.is-light .brand img {
+  filter: drop-shadow(0 0 8px rgba(108, 181, 255, .4));
+}
+.nav-contact, .site-header.is-light .nav-contact {
+  border-color: rgba(169, 209, 255, .28);
+}
+.scroll-story { height: 360vh; }
+.stage {
+  background:
+    radial-gradient(ellipse at 50% 43%, rgba(38, 94, 188, .20), transparent 43%),
+    radial-gradient(ellipse at 84% 68%, rgba(20, 68, 141, .12), transparent 45%),
+    linear-gradient(180deg, #040914, #071326 75%, #081424);
+}
+.space-glow {
+  background:
+    radial-gradient(ellipse at 50% 44%, rgba(31, 90, 184, .17), transparent 38%),
+    radial-gradient(ellipse at 8% 55%, rgba(25, 86, 183, .1), transparent 33%),
+    radial-gradient(ellipse at 92% 60%, rgba(25, 86, 183, .1), transparent 33%);
+}
+.stage-light {
+  background: radial-gradient(ellipse at 50% 50%, rgba(23, 65, 128, .15), transparent 55%);
+}
+.hero-words .eyebrow { color: #a3d2ff; }
+.hero-words .hero-subtitle { color: #d3e8ff; }
+.scroll-invite { color: #a9cbf1; }
+.introduction h1 { color: #f5faff; }
+.introduction h1 em { color: #83cbff; }
+.introduction p { color: #b6cce6; }
+.introduction .section-label { color: #81c3ff; }
+.introduction .pill.primary {
+  background: linear-gradient(115deg, #226bd8, #338de9);
+  color: #fff;
+  box-shadow: 0 15px 42px rgba(27, 96, 206, .22);
+}
+.stage.intro-active .replay {
+  background: rgba(9, 24, 45, .84);
+  color: #dceeff;
+  border-color: rgba(146, 195, 255, .24);
+}
+.stage.intro-active .scroll-hint { color: #8aaacd; }
+.static-logo img { filter: drop-shadow(0 0 25px rgba(49, 138, 255, .4)); }
+
+.about-section {
+  background:
+    radial-gradient(ellipse at 87% 16%, rgba(27, 82, 165, .17), transparent 43%),
+    linear-gradient(180deg, #081424, #071320 100%);
+}
+.ecosystem-section {
+  background:
+    radial-gradient(ellipse at 12% 20%, rgba(32, 87, 167, .16), transparent 42%),
+    linear-gradient(180deg, #071320, #09182b 100%);
+}
+.section-heading h2 { color: #f2f8ff; }
+.section-heading>p { color: #a9bfdc; }
+.section-label { color: #82c7ff; }
+.gradient-text {
+  background: linear-gradient(92deg, #72b9ff, #b3e5ff);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+.stat-card {
+  border: 1px solid rgba(129, 183, 255, .15);
+  border-radius: 18px;
+  padding: 30px 26px;
+  background: linear-gradient(145deg, rgba(15, 37, 68, .74), rgba(9, 23, 43, .8));
+}
+.stat-icon { color: #7bbfff; }
+.stat-card strong { color: #f0f7ff; }
+.stat-card>span:last-child { color: #98b2d1; }
+.product-card {
+  color: #edf6ff;
+  border: 1px solid rgba(134, 193, 255, .17);
+  box-shadow: 0 24px 60px rgba(0, 5, 17, .22);
+}
+.product-card p { color: #b9cde6; }
+.product-meta { color: #a5c8ef; opacity: 1; }
+.card-tag {
+  border-color: rgba(165, 211, 255, .42);
+  color: #cde5ff;
+}
+.ai-card { background: linear-gradient(145deg, #102b58, #091a31 90%); }
+.movia-card { background: linear-gradient(145deg, #172b4b, #0a1b34 90%); }
+.hub-card { background: linear-gradient(145deg, #0f3348, #091b31 90%); }
+.plat-card { background: linear-gradient(145deg, #1a2e4e, #0b1b32 90%); }
+.orb { opacity: .75; }
+.ring { border-color: rgba(117, 187, 255, .37); }
+.hub-grid { opacity: .26; }
+.vision-section {
+  background: linear-gradient(180deg, #09182b, #040914);
+}
+.vision-inner h2 { color: #f2f8ff; }
+.vision-inner h2 span { color: #8ad3ff; }
+.pill.light {
+  background: rgba(30, 80, 145, .15);
+  color: #e6f4ff;
+  border: 1px solid rgba(147, 204, 255, .34);
+}
+.footer {
+  background: #040914;
+  color: #8ea6c2;
+  border-top: 1px solid rgba(150, 193, 255, .13);
+}
+.footer-brand { color: #f1f8ff; }
+.footer-brand img { filter: none; }
+@media (max-width:780px) {
+  .scroll-story { height: 340vh; }
+  .stat-card { padding: 24px 18px; }
+}
+@media (max-width:420px) {
+  .scroll-story { height: 330vh; }
+}
+@media (prefers-reduced-motion:reduce) {
+  .scroll-story { height: 100svh; }
+}
