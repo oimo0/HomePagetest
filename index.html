@@ -1,0 +1,129 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#050b16">
+  <meta name="description" content="ASROの新しいホームページを体験する、粒子で構成されたロゴのインタラクティブな試作サイトです。">
+  <meta property="og:title" content="ASRO — The future starts here">
+  <meta property="og:description" content="数千の光が、ひとつの未来になる。ASRO公式サイトのリニューアルプロトタイプ。">
+  <title>ASRO — The future starts here | Homepage Concept</title>
+  <link rel="icon" href="./assets/asro-logo.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="./style.css">
+  <script type="module" src="./main.js"></script>
+</head>
+<body>
+  <a class="skip-link" href="#about">コンテンツへスキップ</a>
+  <header class="site-header" id="header">
+    <a class="brand" href="#top" aria-label="ASRO ホーム">
+      <img src="./assets/asro-logo.svg" alt="" width="34" height="34">
+      <span>ASRO</span>
+    </a>
+    <nav class="desktop-nav" aria-label="メインナビゲーション">
+      <a href="#about">About</a><a href="#ecosystem">Technology</a><a href="#vision">Vision</a>
+    </nav>
+    <div class="nav-actions">
+      <a class="nav-contact" href="https://asro.jp/" target="_blank" rel="noopener noreferrer">Official site <span aria-hidden="true">↗</span></a>
+      <button type="button" class="menu-toggle" id="menu-toggle" aria-expanded="false" aria-controls="mobile-nav" aria-label="メニューを開く"><span></span><span></span></button>
+    </div>
+    <nav class="mobile-nav" id="mobile-nav" aria-label="モバイルナビゲーション" hidden>
+      <a href="#about">About</a><a href="#ecosystem">Technology</a><a href="#vision">Vision</a>
+      <a href="https://asro.jp/" target="_blank" rel="noopener noreferrer">Official site ↗</a>
+    </nav>
+  </header>
+
+  <main id="top">
+    <div class="scroll-story" id="story">
+      <div class="stage" id="stage">
+        <div class="space-glow" aria-hidden="true"></div>
+        <canvas id="particles" aria-hidden="true"></canvas>
+        <div class="static-logo" id="static-logo" aria-hidden="true">
+          <img src="./assets/asro-logo.svg" alt="">
+        </div>
+        <div class="hero-words" id="hero-words">
+          <p class="eyebrow">INNOVATION BEGINS WITH POSSIBILITY</p>
+          <p class="hero-subtitle">数千の光が、ひとつの未来になる。</p>
+        </div>
+        <div class="scroll-invite" id="scroll-invite" aria-hidden="true"><span>SCROLL TO EXPLORE</span><span class="scroll-line"></span></div>
+        <div class="stage-light" id="stage-light" aria-hidden="true"></div>
+        <div class="introduction" id="introduction">
+          <span class="section-label"><span class="label-dot"></span> INTRODUCING ASRO</span>
+          <h1>明日を、<br><em>つくる。</em></h1>
+          <p>まだない可能性を、テクノロジーの力で。<br>AI、創造、そして人と人とのつながり。<br>ASROは、未来をもっと身近にしていく。</p>
+          <a class="pill primary" href="#about">Discover ASRO <span aria-hidden="true">↗</span></a>
+        </div>
+        <div class="stage-progress" aria-hidden="true"><span id="progress-fill"></span></div>
+        <button class="replay" type="button" id="replay" aria-label="オープニングアニメーションを最初から見る">↺ <span>Replay</span></button>
+        <div class="scroll-hint" id="scroll-hint">Scroll down to transform the particles</div>
+      </div>
+    </div>
+
+    <section id="about" class="section about-section">
+      <div class="section-inner">
+        <div class="section-heading">
+          <span class="section-label"><span class="label-dot"></span> ABOUT ASRO</span>
+          <h2>想像の先へ。<br><span class="gradient-text">技術のその先へ。</span></h2>
+          <p>ASROは、AIとデジタル技術、クリエイティブな発想を組み合わせ、新しい体験を届けるプロジェクト。いくつものサービスが、ひとつの未来につながっていく。</p>
+        </div>
+        <div class="stat-grid">
+          <div class="stat-card"><span class="stat-icon" aria-hidden="true">✧</span><strong>AI</strong><span>Intelligence</span></div>
+          <div class="stat-card"><span class="stat-icon" aria-hidden="true">◈</span><strong>CREATE</strong><span>Imagination</span></div>
+          <div class="stat-card"><span class="stat-icon" aria-hidden="true">⌁</span><strong>CONNECT</strong><span>Possibilities</span></div>
+        </div>
+      </div>
+    </section>
+
+    <section id="ecosystem" class="section ecosystem-section">
+      <div class="section-inner">
+        <div class="section-heading compact">
+          <span class="section-label"><span class="label-dot"></span> OUR ECOSYSTEM</span>
+          <h2>ひとつの未来を、<br>さまざまな技術から。</h2>
+          <p>学ぶこと、つくること、つながること。ASROのサービスが新しい選択肢を広げていく。</p>
+        </div>
+        <div class="product-grid">
+          <article class="product-card ai-card">
+            <div class="card-decoration" aria-hidden="true"><span class="orb orb-a"></span></div>
+            <div class="product-meta"><span>01 / INTELLIGENCE</span><span class="product-icon">✳</span></div>
+            <div><h3>ASRO AI</h3><p>AIを、もっと自由に。KuupやAsraを通じて、知能を身近な存在に。</p></div>
+            <span class="card-tag">AI &amp; Research</span>
+          </article>
+          <article class="product-card movia-card">
+            <div class="card-decoration" aria-hidden="true"><span class="ring ring-a"></span><span class="ring ring-b"></span></div>
+            <div class="product-meta"><span>02 / CREATIVITY</span><span class="product-icon">◇</span></div>
+            <div><h3>ASRO MOVIA</h3><p>創造に、境界はいらない。MootやMoot Pointで、表現を次のステージへ。</p></div>
+            <span class="card-tag">Creative Technology</span>
+          </article>
+          <article class="product-card hub-card">
+            <div class="card-decoration" aria-hidden="true"><span class="hub-grid"></span></div>
+            <div class="product-meta"><span>03 / CONNECTION</span><span class="product-icon">⌘</span></div>
+            <div><h3>ASRO Hub</h3><p>情報と人をつなぎ、毎日を少し便利に。コミュニケーションの新しい基盤。</p></div>
+            <span class="card-tag">Digital Services</span>
+          </article>
+          <article class="product-card plat-card">
+            <div class="card-decoration" aria-hidden="true"><span class="plat-layers"></span></div>
+            <div class="product-meta"><span>04 / FOUNDATION</span><span class="product-icon">▣</span></div>
+            <div><h3>ASRO Plat</h3><p>さまざまなサービスをひとつにつなぐ。安心して使える共通アカウント基盤。</p></div>
+            <span class="card-tag">Platform</span>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <section id="vision" class="section vision-section">
+      <div class="vision-stars" aria-hidden="true"></div>
+      <div class="section-inner vision-inner">
+        <span class="section-label"><span class="label-dot"></span> THE NEXT CHAPTER</span>
+        <h2>未来は、<br>待つものじゃない。<br><span>つくるものだ。</span></h2>
+        <p>想像から創造へ。その一歩を、ASROと。</p>
+        <a class="pill light" href="https://asro.jp/" target="_blank" rel="noopener noreferrer">Visit ASRO official <span aria-hidden="true">↗</span></a>
+      </div>
+    </section>
+  </main>
+
+  <footer class="footer">
+    <a class="footer-brand" href="#top"><img src="./assets/asro-logo.svg" alt="" width="30" height="30"> ASRO</a>
+    <span>Homepage Concept / Particle Experience</span>
+    <span>© ASRO — Demo prototype</span>
+  </footer>
+</body>
+</html>
