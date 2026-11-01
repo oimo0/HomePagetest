@@ -17,7 +17,33 @@ jobs:
         with:
           node-version: '22'
       - name: JavaScript syntax check
-        run: node --check main.js
+        run: |
+          node --check main.js
+          node --check contour-flow.mjs
+      - name: Test closed contour extraction and GPU texture layout
+        run: |
+          node --input-type=module <<'JS'
+          import assert from 'node:assert/strict';
+          import { buildContourPaths, buildFlowTexture } from './contour-flow.mjs';
+          const width=120,height=120,rgba=new Uint8Array(width*height*4);
+          // A ring with a transparent hole plus a separate solid stroke:
+          // exercises both outer and inner closed paths.
+          for(let y=6;y<114;y++)for(let x=6;x<114;x++){
+            const ring=x>12&&x<75&&y>14&&y<103&&!(x>30&&x<57&&y>40&&y<76);
+            const stroke=x>84&&x<102&&y>30&&y<94;
+            if(ring||stroke)rgba[(y*width+x)*4+3]=255;
+          }
+          const paths=buildContourPaths(rgba,width,height,2);
+          assert.ok(paths.length>=4, 'need outer, inner and inset loops');
+          assert.ok(paths.some(p=>p.inset>0),'inset/internal contour required');
+          assert.ok(paths.every(p=>p.points.length>=16));
+          const map=buildFlowTexture(paths,1024);
+          assert.equal(map.textureHeight,map.tracks.length);
+          assert.equal(map.pixels.length,map.textureWidth*map.textureHeight*4);
+          assert.ok(map.tracks.every(t=>t.length>0 && t.length<=map.textureWidth));
+          assert.ok(map.totalWeight>0);
+          console.log('Contour loops:',paths.length,'texture:',map.textureWidth,'x',map.textureHeight);
+          JS
       - name: Verify static assets and internal links
         run: |
           python3 - <<'PY'
