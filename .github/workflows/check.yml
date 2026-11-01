@@ -1,0 +1,44 @@
+name: Validate static site
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: JavaScript syntax check
+        run: node --check main.js
+      - name: Verify static assets and internal links
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          from html.parser import HTMLParser
+          import xml.etree.ElementTree as ET
+          root = Path('.')
+          for f in ['index.html', 'main.js', 'style.css', 'assets/asro-logo.svg']:
+              assert (root / f).exists(), f'Missing asset: {f}'
+          ET.parse('assets/asro-logo.svg')
+          class Links(HTMLParser):
+              urls = []
+              def handle_starttag(self, tag, attrs):
+                  attrs = dict(attrs)
+                  for key in ('src', 'href'):
+                      if key in attrs:
+                          self.urls.append(attrs[key])
+          parser = Links()
+          parser.feed((root / 'index.html').read_text())
+          for link in parser.urls:
+              if link.startswith('./'):
+                  assert (root / link[2:]).exists(), f'Broken local link: {link}'
+          print('All site assets, SVG and static references OK.')
+          PY
