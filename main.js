@@ -21,20 +21,23 @@ const smooth = (a, b, value) => { const t = clamp((value - a) / (b - a)); return
 function updateScroll() {
   const maxScroll = Math.max(1, story.offsetHeight - window.innerHeight);
   const p = reducedMotion.matches ? 0 : clamp(-story.getBoundingClientRect().top / maxScroll);
-  const scatter = smooth(.19, .73, p);
-  const reveal = smooth(.63, .91, p);
+  // Hold the assembled logo longer, then gradually split it in two phases.
+  // Both phases are tied to scroll progress, so reversing scroll reforms the logo.
+  const drift = smooth(.23, .74, p);
+  const spread = smooth(.37, .86, p);
+  const reveal = smooth(.78, .96, p);
   document.documentElement.style.setProperty('--scroll-progress', p.toFixed(4));
-  light.style.opacity = reveal.toFixed(3);
+  light.style.opacity = (reveal * .4).toFixed(3);
   introduction.style.opacity = reveal.toFixed(3);
   introduction.style.transform = `translateY(${(1 - reveal) * 36}px)`;
   introduction.style.pointerEvents = reveal > .85 ? 'auto' : 'none';
-  heroWords.style.opacity = (1 - smooth(.07, .34, p)).toFixed(3);
-  invite.style.opacity = (1 - smooth(.02, .25, p)).toFixed(3);
+  heroWords.style.opacity = (1 - smooth(.16, .43, p)).toFixed(3);
+  invite.style.opacity = (1 - smooth(.08, .34, p)).toFixed(3);
   progressFill.style.width = (p * 100).toFixed(2) + '%';
-  staticLogo.style.opacity = stage.classList.contains('particles-ready') ? '0' : (1 - scatter).toFixed(3);
-  stage.classList.toggle('intro-active', reveal > .65);
-  header.classList.toggle('is-light', reveal > .6 || story.getBoundingClientRect().bottom <= window.innerHeight * .3);
-  return { p, scatter, reveal };
+  staticLogo.style.opacity = stage.classList.contains('particles-ready') ? '0' : (1 - drift).toFixed(3);
+  stage.classList.toggle('intro-active', reveal > .7);
+  header.classList.remove('is-light');
+  return { p, drift, spread, reveal };
 }
 
 let scrollState = updateScroll();
@@ -77,43 +80,51 @@ in float aSeed;
 in float aSize;
 uniform float uTime;
 uniform float uGather;
-uniform float uScatter;
-uniform float uIntro;
+uniform float uDrift;
+uniform float uSpread;
 uniform vec2 uScale;
 uniform vec2 uMouse;
 uniform float uDpr;
 out float vAlpha;
 out float vTone;
+out float vSpread;
 void main() {
-  float gather = uGather*uGather*(3.0-2.0*uGather);
-  float scatter = uScatter*uScatter*(3.0-2.0*uScatter);
-  vec2 target = aTarget*uScale;
-  // Tiny idle vibrations keep the assembled logo alive.
-  vec2 shimmer = vec2(sin(uTime*.8+aSeed*43.0), cos(uTime*.67+aSeed*38.0)) * .0022;
-  vec2 traveling = aOrigin + vec2(sin(uTime*.25+aSeed*31.0),cos(uTime*.3+aSeed*17.0))*.045;
-  vec2 assembled = mix(traveling,target+shimmer,gather);
-  vec2 edges = vec2(aSide.x,aSide.y + sin(uTime*.35+aSeed*22.0)*.045);
-  vec2 position = mix(assembled,edges,scatter);
-  position += uMouse * .016 * (1.0-scatter);
-  gl_Position = vec4(position,0.0,1.0);
-  gl_PointSize = aSize * uDpr * mix(1.0,.82,scatter);
-  vAlpha = mix(.87,.62,scatter) * (.7 + .3*sin(aSeed*99.0+uTime*.8));
+  float gather = smoothstep(0.0, 1.0, uGather);
+  // Stagger each particle just enough to make the breakup and reassembly organic.
+  float drift = smoothstep(0.0, 1.0, uDrift + (aSeed - 0.5) * 0.18);
+  float spread = smoothstep(0.0, 1.0, uSpread + (aSeed - 0.5) * 0.22);
+  vec2 logoPosition = aTarget * uScale;
+  vec2 shimmer = vec2(sin(uTime * 0.74 + aSeed * 43.0),
+                      cos(uTime * 0.62 + aSeed * 38.0)) * .003;
+  vec2 roaming = aOrigin + vec2(sin(uTime * .25 + aSeed * 31.0),
+                                cos(uTime * .3 + aSeed * 17.0)) * .052;
+  vec2 assembled = mix(roaming, logoPosition + shimmer, gather);
+  vec2 peeling = mix(assembled, logoPosition * vec2(.65, .94) + shimmer, drift);
+  vec2 edges = vec2(aSide.x + sin(uTime * .26 + aSeed * 11.0) * .017,
+                    aSide.y + sin(uTime * .42 + aSeed * 22.0) * .064);
+  vec2 position = mix(peeling, edges, drift * spread);
+  position += uMouse * .014 * (1.0 - spread);
+  gl_Position = vec4(position, 0.0, 1.0);
+  gl_PointSize = aSize * uDpr * mix(1.06, 1.25, spread);
+  vAlpha = mix(.88, .94, spread) * (.8 + .2 * sin(aSeed * 99.0 + uTime * .8));
   vTone = aSeed;
+  vSpread = spread;
 }`;
 const fragmentSource = `#version 300 es
 precision highp float;
 in float vAlpha;
 in float vTone;
-uniform float uIntro;
+in float vSpread;
 out vec4 outColor;
 void main() {
-  float d = length(gl_PointCoord-vec2(.5));
-  float halo = 1.0-smoothstep(.06,.5,d);
+  float d = length(gl_PointCoord - vec2(.5));
+  float halo = 1.0 - smoothstep(.10, .5, d);
+  float core = 1.0 - smoothstep(.04, .19, d);
   if (halo < .015) discard;
-  vec3 bright = mix(vec3(.23,.60,1.0),vec3(.83,.95,1.0),vTone);
-  vec3 dark = mix(vec3(.04,.28,.64),vec3(.23,.50,.83),vTone);
-  vec3 color = mix(bright,dark,uIntro);
-  outColor = vec4(color,halo*vAlpha);
+  vec3 color = mix(vec3(.18,.52,1.0),vec3(.81,.95,1.0),vTone);
+  color = mix(color, vec3(.42,.72,1.0),vSpread * .12);
+  float opacity = min(1.0, halo * .68 + core * .62) * vAlpha;
+  outColor = vec4(color, opacity);
 }`;
 
 function shader(gl, type, source) {
@@ -166,7 +177,7 @@ async function startParticles() {
   try {
     const mask = await loadLogoMask();
     const program = createProgram(gl);
-    const count = window.innerWidth < 650 ? 10500 : 20500;
+    const count = window.innerWidth < 650 ? 16000 : 30000;
     const data = {
       aTarget: new Float32Array(count*2),
       aOrigin: new Float32Array(count*2),
@@ -184,10 +195,10 @@ async function startParticles() {
       data.aOrigin[2*i] = Math.cos(angle)*radius*1.25;
       data.aOrigin[2*i+1] = Math.sin(angle)*radius;
       const side = (rand()<.5 ? -1 : 1);
-      data.aSide[2*i] = side * (.76 + rand()*.22);
-      data.aSide[2*i+1] = (rand()*2-1)*.99;
+      data.aSide[2*i] = side * (.72 + rand()*.28);
+      data.aSide[2*i+1] = (rand()*2-1)*.92;
       data.aSeed[i] = seed;
-      data.aSize[i] = .85 + rand()*1.65 + (rand()>.97?1.6:0);
+      data.aSize[i] = 1.35 + rand()*2.0 + (rand()>.965?1.5:0);
     }
     gl.useProgram(program);
     const vao = gl.createVertexArray(); gl.bindVertexArray(vao);
@@ -199,9 +210,9 @@ async function startParticles() {
       gl.vertexAttribPointer(location, name==='aSeed'||name==='aSize'?1:2,gl.FLOAT,false,0,0);
     }
     gl.bindVertexArray(null);
-    gl.enable(gl.BLEND); gl.blendFunc(gl.SRC_ALPHA,gl.ONE_MINUS_SRC_ALPHA);
+    gl.enable(gl.BLEND); gl.blendFunc(gl.SRC_ALPHA,gl.ONE);
     const uniform = {};
-    for (const key of ['uTime','uGather','uScatter','uIntro','uScale','uMouse','uDpr']) uniform[key]=gl.getUniformLocation(program,key);
+    for (const key of ['uTime','uGather','uDrift','uSpread','uScale','uMouse','uDpr']) uniform[key]=gl.getUniformLocation(program,key);
     let width=0,height=0,ratio=1;
     const pointer={x:0,y:0},mouse={x:0,y:0};
     window.addEventListener('pointermove', e => {
@@ -230,15 +241,15 @@ async function startParticles() {
       last=now;
       const rect=story.getBoundingClientRect();
       if (rect.bottom < 0 || rect.top > innerHeight) return;
-      const gather=smooth(0,1,clamp((now-animationStart)/2900));
-      const sizePx=Math.min(width*.78,height*.7,625);
+      const gather=smooth(0,1,clamp((now-animationStart)/3400));
+      const sizePx=Math.min(width*.8,height*.74,690);
       mouse.x+=(pointer.x-mouse.x)*.04;mouse.y+=(pointer.y-mouse.y)*.04;
       gl.clear(gl.COLOR_BUFFER_BIT);
       gl.useProgram(program);gl.bindVertexArray(vao);
       gl.uniform1f(uniform.uTime,(now-start)/1000);
       gl.uniform1f(uniform.uGather,gather);
-      gl.uniform1f(uniform.uScatter,scrollState.scatter);
-      gl.uniform1f(uniform.uIntro,scrollState.reveal);
+      gl.uniform1f(uniform.uDrift,scrollState.drift);
+      gl.uniform1f(uniform.uSpread,scrollState.spread);
       gl.uniform2f(uniform.uScale,sizePx/width,sizePx/height);
       gl.uniform2f(uniform.uMouse,mouse.x,mouse.y);
       gl.uniform1f(uniform.uDpr,ratio);
