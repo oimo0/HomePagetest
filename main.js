@@ -31,7 +31,7 @@ function updateScroll() {
   heroWords.style.opacity = (1 - smooth(.07, .34, p)).toFixed(3);
   invite.style.opacity = (1 - smooth(.02, .25, p)).toFixed(3);
   progressFill.style.width = (p * 100).toFixed(2) + '%';
-  staticLogo.style.opacity = (1 - scatter).toFixed(3);
+  staticLogo.style.opacity = stage.classList.contains('particles-ready') ? '0' : (1 - scatter).toFixed(3);
   stage.classList.toggle('intro-active', reveal > .65);
   header.classList.toggle('is-light', reveal > .6 || story.getBoundingClientRect().bottom <= window.innerHeight * .3);
   return { p, scatter, reveal };
@@ -250,6 +250,7 @@ async function startParticles() {
       stage.classList.remove('particles-ready');
     });
     stage.classList.add('particles-ready');
+    scrollState = updateScroll();
     animationStart=performance.now();
     requestAnimationFrame(render);
   } catch (err) {
