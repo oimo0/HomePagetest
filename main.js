@@ -74,10 +74,12 @@ let animationStart = performance.now();
 const vertexSource = `#version 300 es
 precision highp float;
 in vec2 aTarget;
+in vec2 aFlowTarget;
 in vec2 aOrigin;
 in vec2 aSide;
 in float aSeed;
 in float aSize;
+in float aMotion;
 uniform float uTime;
 uniform float uGather;
 uniform float uDrift;
@@ -89,25 +91,31 @@ out float vAlpha;
 out float vTone;
 out float vSpread;
 out float vSpark;
+out float vMoving;
 void main() {
   float gather = smoothstep(0.0, 1.0, uGather);
   // Stagger each particle just enough to make the breakup and reassembly organic.
   float drift = smoothstep(0.0, 1.0, uDrift + (aSeed - 0.5) * 0.18);
   float spread = smoothstep(0.0, 1.0, uSpread + (aSeed - 0.5) * 0.22);
   vec2 logoPosition = aTarget * uScale;
-  // Two coherent currents pass through the completed mark rather than
-  // freezing every particle at its target. Scale by logo size so mobile
-  // and desktop have similar apparent movement in pixels.
-  float wave = logoPosition.y * 16.0 + logoPosition.x * 7.0 - uTime * 1.25;
+  // Each flow target is ALSO a real point inside the supplied logo.
+  // About 56% of particles travel clearly between two points; the rest
+  // hold the edges, keeping the symbol and wordmark recognizable.
+  float loop = .5 + .5 * sin(uTime * (1.9 + aSeed * .85) + aSeed * 6.283185);
+  loop = smoothstep(0.0, 1.0, loop);
+  vec2 flowing = mix(logoPosition, aFlowTarget * uScale, loop * aMotion);
+
+  // Gentle coordinated waves bring every particle to life. The moving
+  // flow layer is much more noticeable than the earlier tiny shimmer.
+  float wave = logoPosition.y * 15.0 + logoPosition.x * 6.0 - uTime * 1.65;
   vec2 current = vec2(
-    sin(logoPosition.y * 15.0 - uTime * 1.1 + sin(wave) * .35),
-    cos(logoPosition.x * 14.0 + uTime * .96 + cos(wave) * .30)
-  ) * (uScale * .026);
-  // Each particle also has a small personal orbit; the logo stays legible.
-  float orbitPhase = uTime * (1.0 + aSeed * .42) + aSeed * 31.416;
+    sin(logoPosition.y * 13.0 - uTime * 1.55 + sin(wave) * .38),
+    cos(logoPosition.x * 12.0 + uTime * 1.25 + cos(wave) * .30)
+  ) * (uScale * .014);
+  float orbitPhase = uTime * (1.25 + aSeed * .5) + aSeed * 31.416;
   vec2 orbit = vec2(cos(orbitPhase), sin(orbitPhase)) *
-               (uScale * (.008 + aSeed * .009));
-  vec2 aliveLogo = logoPosition + current + orbit;
+               (uScale * (.004 + aSeed * .008));
+  vec2 aliveLogo = flowing + current + orbit;
   vec2 roaming = aOrigin + vec2(sin(uTime * .25 + aSeed * 31.0),
                                 cos(uTime * .3 + aSeed * 17.0)) * .052;
   vec2 assembled = mix(roaming, aliveLogo, gather);
@@ -124,9 +132,14 @@ void main() {
     12.0
   );
   float twinkle = pow(max(0.0, sin(uTime * (1.4 + aSeed) + aSeed * 127.0)), 18.0);
-  float activeGlow = (lightBand * .66 + twinkle * .55) * gather;
-  vSpark = activeGlow;
-  gl_PointSize = aSize * uDpr * mix(1.08, 1.25, spread) * (1.0 + activeGlow * .32);
+  float activeGlow = (lightBand * .75 + twinkle * .64) * gather;
+  // Moving dots are visibly more luminous than the anchored silhouette.
+  float movingGlow = aMotion * (.22 + .55 *
+      pow(max(0.0, sin(uTime * 2.8 + aSeed * 43.0)), 9.0));
+  vSpark = activeGlow + movingGlow * gather;
+  vMoving = aMotion * gather;
+  gl_PointSize = aSize * uDpr * mix(1.08, 1.25, spread) *
+                 (1.0 + activeGlow * .32 + aMotion * .18);
   vAlpha = mix(.88, .94, spread) * (.76 + .24 * sin(aSeed * 99.0 + uTime * .8));
   vTone = aSeed;
   vSpread = spread;
@@ -137,6 +150,7 @@ in float vAlpha;
 in float vTone;
 in float vSpread;
 in float vSpark;
+in float vMoving;
 out vec4 outColor;
 void main() {
   float d = length(gl_PointCoord - vec2(.5));
@@ -145,8 +159,8 @@ void main() {
   if (halo < .015) discard;
   vec3 color = mix(vec3(.18,.52,1.0),vec3(.81,.95,1.0),vTone);
   color = mix(color, vec3(.42,.72,1.0),vSpread * .12);
-  color = mix(color, vec3(.94,.98,1.0), min(1.0, vSpark * .72));
-  float opacity = min(1.0, halo * .68 + core * .62 + vSpark * .24) * vAlpha;
+  color = mix(color, vec3(.94,.98,1.0), min(1.0, vSpark * .72 + vMoving * .17));
+  float opacity = min(1.0, halo * .68 + core * .62 + vSpark * .27 + vMoving * .08) * vAlpha;
   outColor = vec4(color, opacity);
 }`;
 
@@ -203,18 +217,51 @@ async function startParticles() {
     const count = window.innerWidth < 650 ? 16000 : 30000;
     const data = {
       aTarget: new Float32Array(count*2),
+      aFlowTarget: new Float32Array(count*2),
       aOrigin: new Float32Array(count*2),
       aSide: new Float32Array(count*2),
       aSeed: new Float32Array(count),
-      aSize: new Float32Array(count)
+      aSize: new Float32Array(count),
+      aMotion: new Float32Array(count)
     };
     const rand = Math.random;
+    // Validate intermediate positions so a moving particle never cuts
+    // across the background between separate logo strokes or letters.
+    const maskCanvas = document.createElement('canvas');
+    maskCanvas.width = maskCanvas.height = 600;
+    const maskCtx = maskCanvas.getContext('2d', { willReadFrequently:true });
+    const logoImage = new Image();
+    logoImage.src = './assets/asro-logo.svg';
+    await logoImage.decode();
+    maskCtx.drawImage(logoImage, 0, 0, 600, 600);
+    const alpha = maskCtx.getImageData(0, 0, 600, 600).data;
+    const inside = (x,y) => {
+      x=Math.round(x);y=Math.round(y);
+      return x>=0 && x<600 && y>=0 && y<600 && alpha[(y*600+x)*4+3]>170;
+    };
+    const chooseFlow = (x,y) => {
+      for(let attempt=0;attempt<25;attempt++) {
+        const angle=rand()*Math.PI*2, dist=19+rand()*65;
+        const tx=x+Math.cos(angle)*dist, ty=y+Math.sin(angle)*dist;
+        if(inside(tx,ty) &&
+           inside(x+(tx-x)*.2,y+(ty-y)*.2) &&
+           inside(x+(tx-x)*.4,y+(ty-y)*.4) &&
+           inside(x+(tx-x)*.6,y+(ty-y)*.6) &&
+           inside(x+(tx-x)*.8,y+(ty-y)*.8)) return [tx,ty];
+      }
+      return null;
+    };
     for (let i=0;i<count;i++) {
       const [x,y] = mask[Math.floor(rand()*mask.length)];
       const seed = rand(), angle = rand()*Math.PI*2;
       const radius = .32 + Math.sqrt(rand())*1.2;
       data.aTarget[2*i] = (x-293)/196 + (rand()-.5)*.008;
       data.aTarget[2*i+1] = (300-y)/196 + (rand()-.5)*.008;
+      // 56% are traveling particles; the remainder preserve the edges.
+      const other = rand()<.56 ? chooseFlow(x,y) : null;
+      data.aFlowTarget[2*i] = other ? (other[0]-293)/196 : data.aTarget[2*i];
+      data.aFlowTarget[2*i+1] = other ? (300-other[1])/196 : data.aTarget[2*i+1];
+      data.aMotion[i] = other ? .82+rand()*.18 : 0;
       data.aOrigin[2*i] = Math.cos(angle)*radius*1.25;
       data.aOrigin[2*i+1] = Math.sin(angle)*radius;
       const side = (rand()<.5 ? -1 : 1);
@@ -230,7 +277,7 @@ async function startParticles() {
       gl.bindBuffer(gl.ARRAY_BUFFER,buffer);
       gl.bufferData(gl.ARRAY_BUFFER,values,gl.STATIC_DRAW);
       gl.enableVertexAttribArray(location);
-      gl.vertexAttribPointer(location, name==='aSeed'||name==='aSize'?1:2,gl.FLOAT,false,0,0);
+      gl.vertexAttribPointer(location, ['aSeed','aSize','aMotion'].includes(name)?1:2,gl.FLOAT,false,0,0);
     }
     gl.bindVertexArray(null);
     gl.enable(gl.BLEND); gl.blendFunc(gl.SRC_ALPHA,gl.ONE);
